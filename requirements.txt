@@ -35,5 +35,5 @@ typing_extensions==4.15.0
 tzdata==2025.2
 urllib3==2.6.2
 streamlit==1.52.1
-openai==2.9.1
+openai==2.9.0
 python-dotenv==1.0.1
