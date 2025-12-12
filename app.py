@@ -1,21 +1,22 @@
 import streamlit as st
 from openai import OpenAI
-import openai
 import os
-import IPython
-
 from dotenv import load_dotenv
 
-load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
 
+load_dotenv()
+
+api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
     raise RuntimeError("OPENAI_API_KEY not set")
 
 
 client = OpenAI(api_key=api_key)
 
-st.title("Interview simulation ai")
+st.title("Interview Simulation AI")
+
+st.write("OpenAI client initialized successfully ✅")
+
 
 ROLE_PRESETS = {
     "Prompt Engineer 中文面试官 1（Prompt Engineering）": "You are a senior AI interviewer with deep expertise in Prompt Engineering. "
