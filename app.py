@@ -28,11 +28,7 @@ ROLE_PRESETS = {
 }
 
 if "messages" not in st.session_state:
-
     st.session_state.messages = []
-
-if "role" not in st.session_state:
-    st.session_state.role = "默认助手"
 
 role = st.selectbox("选择面试官：", list(ROLE_PRESETS.keys()))
 system_prompt = ROLE_PRESETS[role]
@@ -51,11 +47,15 @@ if user_input:
         st.write(user_input)
 
     full_messages = [
-        {"role": "system", "content": ROLE_PRESETS[role]},
+        {"role": "system", "content": system_prompt},
     ] + st.session_state.messages
 
+    st.caption(full_messages)
+
     response = client.chat.completions.create(
-        model="gpt-4o-mini", messages=full_messages  # 用 OpenAI 线上模型
+        model="gpt-4o-mini", messages=full_messages,  # 用 OpenAI 线上模型
+        temperature=0.2,
+        top_p=0.8
     )
 
     bot_msg = response.choices[0].message.content
