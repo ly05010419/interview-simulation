@@ -31,7 +31,6 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 role = st.selectbox("选择面试官：", list(ROLE_PRESETS.keys()))
-system_prompt = ROLE_PRESETS[role]
 
 
 for msg in st.session_state.messages:
@@ -46,9 +45,13 @@ if user_input:
     with st.chat_message("user"):
         st.write(user_input)
 
+    MAX_HISTORY_MESSAGES = 12
+
+    recent_messages = st.session_state.messages[-MAX_HISTORY_MESSAGES:]
+
     full_messages = [
-        {"role": "system", "content": system_prompt},
-    ] + st.session_state.messages
+        {"role": "system", "content": ROLE_PRESETS[role]},
+    ] + recent_messages
 
     st.caption(full_messages)
 
