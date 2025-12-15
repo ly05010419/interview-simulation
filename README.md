@@ -21,45 +21,6 @@ The app analyzes a Job Description (JD), derives an interview strategy, and cond
 
 ---
 
-## 🛠️ Tech Stack
-
-- **Frontend / App Framework:** Streamlit
-- **Backend Language:** Python
-- **LLM API:** OpenAI Chat Completions API
-- **State Management:** `st.session_state`
-
----
-
-## 📦 Installation
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/your-username/ai-interview-prep.git
-cd ai-interview-prep
-```
-
-### 2. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Configure API Key
-
-Create a `.streamlit/secrets.toml` file:
-
-```toml
-OPENAI_API_KEY = "sk-xxxxxxxx"
-```
-
-### 4. Run the app
-
-```bash
-streamlit run app.py
-```
-
----
 
 ## 🧠 How It Works
 
@@ -87,7 +48,6 @@ This application includes multiple security guards to prevent misuse of the AI i
 - Prevent prompt injection and system instruction override
 - Ensure user inputs remain relevant to interview preparation
 - Protect against API abuse and excessive usage
-- Maintain consistent interviewer behavior across sessions
 
 ---
 
@@ -160,15 +120,3 @@ This layered approach significantly reduces the risk of prompt injection, misuse
 
 ---
 
-## 📈 Future Improvements
-
-- Multi-interviewer modes (HR / Tech / System Design)
-- Automated scoring dashboard
-- Token & cost monitoring
-- Hybrid rule-based + LLM security guards
-
----
-
-## 📄 License
-
-This project is intended for educational and portfolio purposes.
