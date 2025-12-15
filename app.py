@@ -39,6 +39,28 @@ for msg in st.session_state.messages:
 
 user_input = st.chat_input("请输入内容...")
 
+
+
+MODEL_NAME = "gpt-4o-mini"
+
+MODEL_PRICING = {
+    "gpt-4o": {
+        "input": 2.50 / 1_000_000,
+        "output": 10.00 / 1_000_000
+    },
+    "gpt-4o-mini": {   # 如果你还想保留
+        "input": 0.15 / 1_000_000,
+        "output": 0.60 / 1_000_000
+    }
+}
+
+def calculate_cost(model, prompt_tokens, completion_tokens):
+    pricing = MODEL_PRICING[model]
+    return (
+        prompt_tokens * pricing["input"] +
+        completion_tokens * pricing["output"]
+    )
+
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
@@ -56,13 +78,28 @@ if user_input:
     st.caption(full_messages)
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini", messages=full_messages,  # 用 OpenAI 线上模型
+        model=MODEL_NAME, messages=full_messages,  # 用 OpenAI 线上模型
         temperature=0.2,
         top_p=0.8
     )
+
+    usage = response.usage
+    prompt_tokens = usage.prompt_tokens
+    completion_tokens = usage.completion_tokens
+    total_tokens = usage.total_tokens
+    cost = calculate_cost(
+    MODEL_NAME,
+    prompt_tokens,
+    completion_tokens
+)
 
     bot_msg = response.choices[0].message.content
     st.session_state.messages.append({"role": "assistant", "content": bot_msg})
 
     with st.chat_message("assistant"):
         st.write(bot_msg)
+        st.caption(
+            f"Tokens: {total_tokens} "
+            f"(Prompt: {prompt_tokens}, Completion: {completion_tokens}) | "
+            f"Cost: ${cost:.6f}"
+        )
