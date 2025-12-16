@@ -109,6 +109,10 @@ def update_cost(usage):
 
 # ================== CORE ==================
 
+
+if "job_analyzed" not in st.session_state:
+    st.session_state.job_analyzed = False
+
 def analyze_job_description(jd_text: str) -> str:
     response = client.chat.completions.create(
         model=MODEL_NAME,
@@ -189,6 +193,7 @@ job_desc = st.text_area(
 if st.button("🔍 Analyze Job Description") and job_desc:
     with st.spinner("Analyzing JD..."):
         st.session_state.interview_strategy = analyze_job_description(job_desc)
+        st.session_state.job_analyzed = True
 
 if "interview_strategy" in st.session_state:
     st.markdown("### 📌 Interview Strategy")
@@ -197,16 +202,19 @@ if "interview_strategy" in st.session_state:
 # ---------- Start Interview ----------
 st.subheader("2️⃣ Start Interview")
 
-if st.button("🚀 Start Interview") and not st.session_state.interview_started:
-    system_prompt = build_interview_system_prompt(
-        st.session_state.get("interview_strategy", "General interview")
-    )
+if st.session_state.job_analyzed:
+    if st.button("🚀 Start Interview") and not st.session_state.interview_started:
+        system_prompt = build_interview_system_prompt(
+            st.session_state.get("interview_strategy", "General interview")
+        )
 
-    st.session_state.messages = [{"role": "system", "content": system_prompt}]
-    st.session_state.interview_started = True
+        st.session_state.messages = [{"role": "system", "content": system_prompt}]
+        st.session_state.interview_started = True
 
-    first_q = call_interviewer(st.session_state.messages)
-    st.session_state.messages.append({"role": "assistant", "content": first_q})
+        first_q = call_interviewer(st.session_state.messages)
+        st.session_state.messages.append({"role": "assistant", "content": first_q})
+else:
+    st.info("Please analyze the Job Description before starting the interview.")
 
 # ---------- Interview ----------
 if st.session_state.interview_started:
@@ -277,3 +285,6 @@ col3.metric(
     "Estimated Cost (USD)",
     f"${st.session_state.token_usage['cost_usd']:.6f}"
 )
+
+if st.session_state.token_usage['cost_usd'] == 0:
+    st.info("No cost yet. Start the interview to see your Cost.")

@@ -100,3 +100,16 @@ This project was created as part of an **AI Engineering / Prompt Engineering  sp
 - Production-aware AI system design
 
 ---
+
+## Bonus Points:
+
+Medium:
+
+- Deploy your app to the Internet.
+- Calculate and provide output to the user on the price of the prompt.
+- Add a separate text field or another field to include the job description (the position) you are applying for and getting interview preparation for that particular position (RAG).
+
+Hard:
+
+- Using Streamlit (Python) or React (JS) components, implement a full-fledged chatbot application instead of a one-time call to the OpenAI API.
+- Deploy your app to one of these cloud providers: Gemini, AWS, or Azure.
