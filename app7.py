@@ -81,7 +81,6 @@ Rules:
 - Wait for the candidate's answer
 - Give concise feedback aligned with persona
 - Always include: Score: X/5
-- Do NOT ignore difficulty or persona
 - After feedback, ask the next question
 """
 
@@ -198,11 +197,22 @@ if "request_count" not in st.session_state:
 
 st.title("🤖 AI Interview Preparation App")
 
-# --- Job Description ---
+# ---------- Job Description ----------
 st.subheader("1️⃣ Job Description")
-job_desc = st.text_area("Paste the job description", height=160)
 
-if st.button("🔍 Analyze Job Description") and job_desc:
+job_desc = st.text_area(
+    "Paste the job description",
+    height=160,
+    disabled=st.session_state.interview_started
+)
+
+if (
+    st.button(
+        "🔍 Analyze Job Description",
+        disabled=st.session_state.interview_started
+    )
+    and job_desc
+):
     st.session_state.interview_strategy = analyze_job_description(job_desc)
     st.session_state.job_analyzed = True
 
@@ -210,27 +220,35 @@ if "interview_strategy" in st.session_state:
     st.markdown("### 📌 Interview Strategy")
     st.markdown(st.session_state.interview_strategy)
 
-# --- Difficulty ---
-st.subheader("🎯 Difficulty")
-st.session_state.difficulty = st.radio(
-    "Select difficulty",
-    ["Easy", "Medium", "Hard"],
-    horizontal=True
-)
-
-# --- Persona ---
-st.subheader("🎭 Interviewer Persona")
-st.session_state.persona = st.radio(
-    "Select persona",
-    ["Strict", "Neutral", "Friendly"],
-    horizontal=True
-)
-
-# --- Start Interview ---
+# ---------- Start Interview (CONFIG + ACTION) ----------
 st.subheader("2️⃣ Start Interview")
 
+
+# Start Interview button
 if st.session_state.job_analyzed:
-    if st.button("🚀 Start Interview") and not st.session_state.interview_started:
+
+    st.markdown("#### 🎯 Difficulty")
+    st.session_state.difficulty = st.radio(
+        "Select difficulty",
+        ["Easy", "Medium", "Hard"],
+        horizontal=True,
+        disabled=st.session_state.interview_started
+    )
+
+    # Persona
+    st.markdown("#### 🎭 Interviewer Persona")
+    st.session_state.persona = st.radio(
+        "Select persona",
+        ["Strict", "Neutral", "Friendly"],
+        horizontal=True,
+        disabled=st.session_state.interview_started
+    )
+
+
+    if st.button(
+        "🚀 Start Interview",
+        disabled=st.session_state.interview_started
+    ):
         system_prompt = build_interview_system_prompt(
             st.session_state.interview_strategy,
             st.session_state.difficulty,
@@ -241,10 +259,11 @@ if st.session_state.job_analyzed:
 
         first_q = call_interviewer(st.session_state.messages)
         st.session_state.messages.append({"role": "assistant", "content": first_q})
+        st.rerun()
 else:
     st.info("Please analyze the Job Description first.")
 
-# --- Interview Session ---
+# ---------- Interview Session ----------
 if st.session_state.interview_started:
     st.subheader("💬 Interview Session")
 
@@ -284,7 +303,7 @@ if st.session_state.interview_started:
         with st.chat_message("assistant"):
             st.write(reply)
 
-# --- Performance (ONLY when scores exist) ---
+# ---------- Performance ----------
 if st.session_state.scores:
     st.subheader("📊 Performance")
 
@@ -293,7 +312,7 @@ if st.session_state.scores:
     c1.metric("Questions Answered", len(st.session_state.scores))
     c2.metric("Average Score", avg_score)
 
-# --- Usage & Cost (ONLY when tokens > 0) ---
+# ---------- Usage & Cost ----------
 if st.session_state.token_usage["prompt_tokens"] > 0:
     st.subheader("💰 Usage & Cost")
 
@@ -305,14 +324,11 @@ if st.session_state.token_usage["prompt_tokens"] > 0:
         f"${st.session_state.token_usage['cost_usd']:.6f}"
     )
 
-# --- Reset ---
+# ---------- Reset ----------
 st.divider()
 st.subheader("🔄 Interview Reset")
 
 if st.button("🆕 Start New Interview"):
     reset_interview()
-    st.success(
-        "Interview reset. Session, score, and cost cleared. "
-        "You can now start a new interview."
-    )
+    st.success("Interview reset. You can start a new interview.")
     st.rerun()
