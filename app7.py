@@ -16,6 +16,7 @@ MODEL_NAME = "gpt-4o-mini"
 MAX_INPUT_LENGTH = 800
 MAX_REQUESTS_PER_SESSION = 30
 
+# ===== Pricing (USD per 1M tokens) =====
 PRICE_INPUT_PER_M = 0.05
 PRICE_OUTPUT_PER_M = 0.40
 
@@ -43,13 +44,32 @@ Output format:
 - Evaluation Criteria:
 """
 
+JD_GUARD_PROMPT = """
+You are a validator for a job interview preparation app.
+
+Determine whether the following text is a real job description.
+
+A valid job description usually contains at least one of:
+- A job title or role
+- Responsibilities or tasks
+- Required or preferred skills
+- Experience or qualifications
+- Team, company, or project context
+
+If it is a valid job description, respond with:
+VALID
+
+Otherwise respond with:
+INVALID
+"""
+
 INPUT_GUARD_PROMPT = """
 You are a security guard for an AI interview application.
 
 If the input is a valid interview answer respond:
 VALID
 
-Otherwise respond:
+Otherwise respond with:
 INVALID
 """
 
@@ -83,7 +103,7 @@ Rules:
 
 # ================== SECURITY ==================
 
-def check_moderation(text):
+def check_moderation(text: str) -> bool:
     r = client.moderations.create(
         model="omni-moderation-latest",
         input=text,
@@ -91,7 +111,19 @@ def check_moderation(text):
     return not r.results[0].flagged
 
 
-def validate_user_input(text):
+def validate_job_description(text: str) -> bool:
+    r = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": JD_GUARD_PROMPT},
+            {"role": "user", "content": text}
+        ],
+        temperature=0.0,
+    )
+    return r.choices[0].message.content.startswith("VALID")
+
+
+def validate_user_input(text: str) -> bool:
     r = client.chat.completions.create(
         model=MODEL_NAME,
         messages=[
@@ -200,6 +232,19 @@ if st.button(
     type="primary",
     disabled=st.session_state.interview_started
 ) and job_desc:
+
+    # ---- Guards for JD ----
+    if not check_moderation(job_desc):
+        st.error("Job description violates safety policy.")
+        st.stop()
+
+    if not validate_job_description(job_desc):
+        st.warning(
+            "This does not look like a job description. "
+            "Please paste a real job description."
+        )
+        st.stop()
+
     st.session_state.show_jd_dialog = True
     st.rerun()
 
@@ -255,9 +300,11 @@ if st.session_state.starting_interview:
         st.session_state.difficulty,
         st.session_state.persona
     )
+
     st.session_state.messages = [{"role": "system", "content": system_prompt}]
     first_q = call_interviewer(st.session_state.messages)
     st.session_state.messages.append({"role": "assistant", "content": first_q})
+
     st.session_state.starting_interview = False
     st.rerun()
 
@@ -322,3 +369,7 @@ if st.button("🆕 Start New Interview", type="primary"):
     reset_interview_only()
     st.success("Interview reset. Job analysis is kept.")
     st.rerun()
+
+
+st.write("Custom theme:",
+         os.path.exists(".streamlit/config.toml"))
