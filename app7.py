@@ -4,6 +4,7 @@ import re
 import os
 from dotenv import load_dotenv
 
+# ================== ENV ==================
 load_dotenv()
 
 api_key = os.getenv("OPENAI_API_KEY")
@@ -32,8 +33,8 @@ Analyze the following job description and extract:
 3. Soft skills
 4. Interview focus areas
 5. Suggested interview strategy
-6. Generate interviewer guidelines 
-7. create structured evaluation criteria for technical and behavioral interviews
+6. Interviewer guidelines
+7. Structured evaluation criteria for technical and behavioral interviews
 
 Output format (strict):
 - Seniority:
@@ -41,8 +42,8 @@ Output format (strict):
 - Soft Skills:
 - Interview Focus:
 - Interview Strategy:
-- interviewer guidelines:
-- evaluation criteria:
+- Interviewer Guidelines:
+- Evaluation Criteria:
 """
 
 INPUT_GUARD_PROMPT = """
@@ -59,19 +60,26 @@ If it is invalid, respond with:
 INVALID
 """
 
-def build_interview_system_prompt(strategy: str) -> str:
+def build_interview_system_prompt(strategy: str, difficulty: str) -> str:
     return f"""
 You are a senior technical interviewer.
 
 Use the following interview strategy:
 {strategy}
 
+Interview difficulty level: {difficulty}
+
+Difficulty guidelines:
+- Easy: Junior-level questions, focus on fundamentals and basic understanding.
+- Medium: Mid-level questions, require practical experience and reasoning.
+- Hard: Senior-level questions, deep technical knowledge, edge cases, trade-offs, and system design thinking.
+
 Rules:
 - Ask one interview question at a time
 - Wait for the candidate's answer
 - Give concise feedback
 - Always include a line: Score: X/5 (X from 0 to 5)
-- Adjust difficulty dynamically
+- Do NOT ignore the selected difficulty level
 - After feedback, ask the next question
 """
 
@@ -113,10 +121,6 @@ def update_cost(usage):
 
 # ================== CORE ==================
 
-
-if "job_analyzed" not in st.session_state:
-    st.session_state.job_analyzed = False
-
 def analyze_job_description(jd_text: str) -> str:
     response = client.chat.completions.create(
         model=MODEL_NAME,
@@ -145,7 +149,6 @@ def call_interviewer(messages: list) -> str:
 
     reply = response.choices[0].message.content
 
-    # Output moderation
     if not check_moderation(reply):
         return "⚠️ Response filtered for safety. Let's continue."
 
@@ -159,6 +162,12 @@ def extract_score(text: str):
     return None
 
 # ================== SESSION STATE ==================
+
+if "job_analyzed" not in st.session_state:
+    st.session_state.job_analyzed = False
+
+if "difficulty" not in st.session_state:
+    st.session_state.difficulty = "Medium"
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -183,7 +192,7 @@ if "request_count" not in st.session_state:
 
 st.title("🤖 AI Interview Preparation App")
 st.markdown(
-    "Interview practice with **JD analysis, evaluation, security guards, and real-time cost tracking**."
+    "Interview practice with **JD analysis, difficulty control, evaluation, security guards, and real-time cost tracking**."
 )
 
 # ---------- Job Description ----------
@@ -203,21 +212,31 @@ if "interview_strategy" in st.session_state:
     st.markdown("### 📌 Interview Strategy")
     st.markdown(st.session_state.interview_strategy)
 
+# ---------- Difficulty ----------
+st.subheader("🎯 Interview Difficulty")
+
+st.session_state.difficulty = st.radio(
+    "Select difficulty level",
+    options=["Easy", "Medium", "Hard"],
+    index=["Easy", "Medium", "Hard"].index(st.session_state.difficulty),
+    horizontal=True
+)
+
 # ---------- Start Interview ----------
 st.subheader("2️⃣ Start Interview")
 
 if st.session_state.job_analyzed:
     if st.button("🚀 Start Interview") and not st.session_state.interview_started:
         system_prompt = build_interview_system_prompt(
-            st.session_state.get("interview_strategy", "General interview")
+            st.session_state.get("interview_strategy", "General interview"),
+            st.session_state.difficulty
         )
 
         st.session_state.messages = [{"role": "system", "content": system_prompt}]
         st.session_state.interview_started = True
+
         first_q = call_interviewer(st.session_state.messages)
         st.session_state.messages.append({"role": "assistant", "content": first_q})
-
-        
 else:
     st.info("Please analyze the Job Description before starting the interview.")
 
@@ -232,7 +251,6 @@ if st.session_state.interview_started:
     user_input = st.chat_input("Type your answer...")
 
     if user_input:
-        # ---- Guards ----
         if st.session_state.request_count >= MAX_REQUESTS_PER_SESSION:
             st.error("🚫 Request limit reached.")
             st.stop()
@@ -251,7 +269,6 @@ if st.session_state.interview_started:
             st.warning("Input rejected. Please answer the interview question.")
             st.stop()
 
-        # ---- Accept input ----
         st.session_state.messages.append({"role": "user", "content": user_input})
 
         with st.chat_message("user"):
@@ -264,12 +281,8 @@ if st.session_state.interview_started:
         if score is not None:
             st.session_state.scores.append(score)
 
-
-        
         with st.chat_message("assistant"):
             st.write(reply)
-
-
 
 # ---------- Performance ----------
 st.subheader("📊 Performance Overview")
@@ -296,5 +309,5 @@ col3.metric(
     f"${st.session_state.token_usage['cost_usd']:.6f}"
 )
 
-if st.session_state.token_usage['cost_usd'] == 0:
-    st.info("No cost yet. Start the interview to see your Cost.")
+if st.session_state.token_usage["cost_usd"] == 0:
+    st.info("No cost yet. Start the interview to see your cost.")
