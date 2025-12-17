@@ -55,55 +55,54 @@ Otherwise respond:
 INVALID
 """
 
-def build_interview_system_prompt(strategy: str, difficulty: str, persona: str) -> str:
+def build_interview_system_prompt(strategy, difficulty, persona):
     return f"""
 You are a senior technical interviewer.
 
-Interview persona: {persona}
+Interviewer persona: {persona}
+Interview difficulty: {difficulty}
 
 Persona behavior:
 - Strict: Critical, challenging, conservative scoring
 - Neutral: Objective and professional
 - Friendly: Encouraging and supportive
 
-Interview difficulty: {difficulty}
-
 Difficulty levels:
-- Easy: Fundamentals, junior level
-- Medium: Practical experience, reasoning
-- Hard: Deep knowledge, edge cases, trade-offs
+- Easy: Fundamentals
+- Medium: Practical experience
+- Hard: Deep knowledge
 
 Use the following interview strategy:
 {strategy}
 
 Rules:
 - Ask one question at a time
-- Wait for the candidate's answer
-- Give concise feedback aligned with persona
+- Wait for the answer
+- Give concise feedback
 - Always include: Score: X/5
-- After feedback, ask the next question
+- Ask the next question
 """
 
 # ================== SECURITY ==================
 
-def check_moderation(text: str) -> bool:
-    response = client.moderations.create(
+def check_moderation(text):
+    r = client.moderations.create(
         model="omni-moderation-latest",
         input=text,
     )
-    return not response.results[0].flagged
+    return not r.results[0].flagged
 
 
-def validate_user_input(user_text: str) -> bool:
-    response = client.chat.completions.create(
+def validate_user_input(text):
+    r = client.chat.completions.create(
         model=MODEL_NAME,
         messages=[
             {"role": "system", "content": INPUT_GUARD_PROMPT},
-            {"role": "user", "content": user_text}
+            {"role": "user", "content": text}
         ],
         temperature=0.0,
     )
-    return response.choices[0].message.content.startswith("VALID")
+    return r.choices[0].message.content.startswith("VALID")
 
 # ================== COST ==================
 
@@ -118,45 +117,49 @@ def update_cost(usage):
 
 # ================== CORE ==================
 
-def analyze_job_description(jd_text: str) -> str:
-    response = client.chat.completions.create(
+def analyze_job_description(text):
+    r = client.chat.completions.create(
         model=MODEL_NAME,
         messages=[
             {"role": "system", "content": JD_ANALYSIS_PROMPT},
-            {"role": "user", "content": jd_text}
+            {"role": "user", "content": text}
         ],
         temperature=0.3,
     )
-    if response.usage:
-        update_cost(response.usage)
-    return response.choices[0].message.content
+    if r.usage:
+        update_cost(r.usage)
+    return r.choices[0].message.content
 
 
-def call_interviewer(messages: list) -> str:
-    response = client.chat.completions.create(
+def call_interviewer(messages):
+    r = client.chat.completions.create(
         model=MODEL_NAME,
         messages=messages,
         temperature=0.7,
     )
-    if response.usage:
-        update_cost(response.usage)
+    if r.usage:
+        update_cost(r.usage)
 
-    reply = response.choices[0].message.content
+    reply = r.choices[0].message.content
     if not check_moderation(reply):
         return "⚠️ Response filtered for safety."
     return reply
 
 
-def extract_score(text: str):
-    match = re.search(r"Score:\s*([0-5])\s*/\s*5", text)
-    return int(match.group(1)) if match else None
+def extract_score(text):
+    m = re.search(r"Score:\s*([0-5])\s*/\s*5", text)
+    return int(m.group(1)) if m else None
 
 
-def reset_interview():
+# ✅ Reset = 只重置“面试”，不动 JD
+def reset_interview_only():
+    st.session_state.interview_started = False
+    st.session_state.starting_interview = False
+
     st.session_state.messages = []
     st.session_state.scores = []
-    st.session_state.interview_started = False
     st.session_state.request_count = 0
+
     st.session_state.token_usage = {
         "prompt_tokens": 0,
         "completion_tokens": 0,
@@ -165,33 +168,25 @@ def reset_interview():
 
 # ================== SESSION STATE ==================
 
-if "job_analyzed" not in st.session_state:
-    st.session_state.job_analyzed = False
+st.session_state.setdefault("job_analyzed", False)
+st.session_state.setdefault("interview_started", False)
+st.session_state.setdefault("starting_interview", False)
 
-if "difficulty" not in st.session_state:
-    st.session_state.difficulty = "Medium"
+st.session_state.setdefault("difficulty", "Medium")
+st.session_state.setdefault("persona", "Neutral")
 
-if "persona" not in st.session_state:
-    st.session_state.persona = "Neutral"
+st.session_state.setdefault("messages", [])
+st.session_state.setdefault("scores", [])
+st.session_state.setdefault("request_count", 0)
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+st.session_state.setdefault("show_jd_dialog", False)
+st.session_state.setdefault("jd_done", False)
 
-if "scores" not in st.session_state:
-    st.session_state.scores = []
-
-if "token_usage" not in st.session_state:
-    st.session_state.token_usage = {
-        "prompt_tokens": 0,
-        "completion_tokens": 0,
-        "cost_usd": 0.0
-    }
-
-if "interview_started" not in st.session_state:
-    st.session_state.interview_started = False
-
-if "request_count" not in st.session_state:
-    st.session_state.request_count = 0
+st.session_state.setdefault("token_usage", {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "cost_usd": 0.0
+})
 
 # ================== UI ==================
 
@@ -206,65 +201,77 @@ job_desc = st.text_area(
     disabled=st.session_state.interview_started
 )
 
-if (
-    st.button(
-        "🔍 Analyze Job Description",
-        disabled=st.session_state.interview_started
-    )
-    and job_desc
-):
-    st.session_state.interview_strategy = analyze_job_description(job_desc)
-    st.session_state.job_analyzed = True
+if st.button("🔍 Analyze Job Description", disabled=st.session_state.interview_started) and job_desc:
+    st.session_state.show_jd_dialog = True
+    st.session_state.jd_done = False
+    st.rerun()
 
-if "interview_strategy" in st.session_state:
+# ---------- Dialog ----------
+if st.session_state.show_jd_dialog:
+    st.dialog("Job Analysis")
+    st.markdown("### ⏳ Analyzing job description…")
+    st.markdown("Please wait while the analysis is running.")
+
+    if not st.session_state.jd_done:
+        st.session_state.interview_strategy = analyze_job_description(job_desc)
+        st.session_state.job_analyzed = True
+        st.session_state.jd_done = True
+        st.rerun()
+
+    st.success("✅ Analysis completed.")
+    if st.button("Close"):
+        st.session_state.show_jd_dialog = False
+        st.rerun()
+
+# ---------- Strategy ----------
+if st.session_state.job_analyzed:
     st.markdown("### 📌 Interview Strategy")
     st.markdown(st.session_state.interview_strategy)
 
-# ---------- Start Interview (CONFIG + ACTION) ----------
+# ---------- Start Interview ----------
 st.subheader("2️⃣ Start Interview")
 
-
-# Start Interview button
 if st.session_state.job_analyzed:
 
     st.markdown("#### 🎯 Difficulty")
     st.session_state.difficulty = st.radio(
-        "Select difficulty",
+        "Difficulty",
         ["Easy", "Medium", "Hard"],
         horizontal=True,
         disabled=st.session_state.interview_started
     )
 
-    # Persona
     st.markdown("#### 🎭 Interviewer Persona")
     st.session_state.persona = st.radio(
-        "Select persona",
+        "Persona",
         ["Strict", "Neutral", "Friendly"],
         horizontal=True,
         disabled=st.session_state.interview_started
     )
 
-
-    if st.button(
-        "🚀 Start Interview",
-        disabled=st.session_state.interview_started
-    ):
-        system_prompt = build_interview_system_prompt(
-            st.session_state.interview_strategy,
-            st.session_state.difficulty,
-            st.session_state.persona
-        )
-        st.session_state.messages = [{"role": "system", "content": system_prompt}]
+    if st.button("🚀 Start Interview", disabled=st.session_state.interview_started):
+        # Phase 1 — 立即锁 UI
         st.session_state.interview_started = True
-
-        first_q = call_interviewer(st.session_state.messages)
-        st.session_state.messages.append({"role": "assistant", "content": first_q})
+        st.session_state.starting_interview = True
         st.rerun()
-else:
-    st.info("Please analyze the Job Description first.")
 
-# ---------- Interview Session ----------
-if st.session_state.interview_started:
+# ---------- Phase 2: API call ----------
+if st.session_state.starting_interview:
+    system_prompt = build_interview_system_prompt(
+        st.session_state.interview_strategy,
+        st.session_state.difficulty,
+        st.session_state.persona
+    )
+
+    st.session_state.messages = [{"role": "system", "content": system_prompt}]
+    first_q = call_interviewer(st.session_state.messages)
+    st.session_state.messages.append({"role": "assistant", "content": first_q})
+
+    st.session_state.starting_interview = False
+    st.rerun()
+
+# ---------- Interview ----------
+if st.session_state.interview_started and st.session_state.messages:
     st.subheader("💬 Interview Session")
 
     for msg in st.session_state.messages[1:]:
@@ -306,29 +313,24 @@ if st.session_state.interview_started:
 # ---------- Performance ----------
 if st.session_state.scores:
     st.subheader("📊 Performance")
-
-    avg_score = round(sum(st.session_state.scores) / len(st.session_state.scores), 2)
+    avg = round(sum(st.session_state.scores) / len(st.session_state.scores), 2)
     c1, c2 = st.columns(2)
     c1.metric("Questions Answered", len(st.session_state.scores))
-    c2.metric("Average Score", avg_score)
+    c2.metric("Average Score", avg)
 
-# ---------- Usage & Cost ----------
+# ---------- Cost ----------
 if st.session_state.token_usage["prompt_tokens"] > 0:
     st.subheader("💰 Usage & Cost")
-
     c1, c2, c3 = st.columns(3)
     c1.metric("Prompt Tokens", st.session_state.token_usage["prompt_tokens"])
     c2.metric("Completion Tokens", st.session_state.token_usage["completion_tokens"])
-    c3.metric(
-        "Estimated Cost (USD)",
-        f"${st.session_state.token_usage['cost_usd']:.6f}"
-    )
+    c3.metric("Estimated Cost (USD)", f"${st.session_state.token_usage['cost_usd']:.6f}")
 
 # ---------- Reset ----------
 st.divider()
 st.subheader("🔄 Interview Reset")
 
 if st.button("🆕 Start New Interview"):
-    reset_interview()
-    st.success("Interview reset. You can start a new interview.")
+    reset_interview_only()
+    st.success("Interview reset. Job analysis is kept.")
     st.rerun()
