@@ -16,7 +16,6 @@ MODEL_NAME = "gpt-4o-mini"
 MAX_INPUT_LENGTH = 800
 MAX_REQUESTS_PER_SESSION = 30
 
-# ===== Pricing (USD per 1M tokens) =====
 PRICE_INPUT_PER_M = 0.05
 PRICE_OUTPUT_PER_M = 0.40
 
@@ -150,7 +149,6 @@ def extract_score(text):
     return int(m.group(1)) if m else None
 
 
-# Reset = 只重置面试，不重置 JD
 def reset_interview_only():
     st.session_state.interview_started = False
     st.session_state.starting_interview = False
@@ -177,7 +175,6 @@ st.session_state.setdefault("scores", [])
 st.session_state.setdefault("request_count", 0)
 
 st.session_state.setdefault("show_jd_dialog", False)
-st.session_state.setdefault("jd_done", False)
 
 st.session_state.setdefault("token_usage", {
     "prompt_tokens": 0,
@@ -198,9 +195,12 @@ job_desc = st.text_area(
     disabled=st.session_state.interview_started
 )
 
-if st.button("🔍 Analyze Job Description", disabled=st.session_state.interview_started) and job_desc:
+if st.button(
+    "🔍 Analyze Job Description",
+    type="primary",
+    disabled=st.session_state.interview_started
+) and job_desc:
     st.session_state.show_jd_dialog = True
-    st.session_state.jd_done = False
     st.rerun()
 
 # ---------- Dialog ----------
@@ -208,16 +208,10 @@ if st.session_state.show_jd_dialog:
     st.dialog("Job Analysis")
     st.markdown("### ⏳ Analyzing job description…")
 
-    if not st.session_state.jd_done:
-        st.session_state.interview_strategy = analyze_job_description(job_desc)
-        st.session_state.job_analyzed = True
-        st.session_state.jd_done = True
-        st.rerun()
-
-    st.success("✅ Analysis completed.")
-    if st.button("Close"):
-        st.session_state.show_jd_dialog = False
-        st.rerun()
+    st.session_state.interview_strategy = analyze_job_description(job_desc)
+    st.session_state.job_analyzed = True
+    st.session_state.show_jd_dialog = False
+    st.rerun()
 
 # ---------- Strategy ----------
 if st.session_state.job_analyzed:
@@ -245,32 +239,32 @@ if st.session_state.job_analyzed:
         disabled=st.session_state.interview_started
     )
 
-    if st.button("🚀 Start Interview", disabled=st.session_state.interview_started):
-        # Phase 1: 立刻锁 UI
+    if st.button(
+        "🚀 Start Interview",
+        type="primary",
+        disabled=st.session_state.interview_started
+    ):
         st.session_state.interview_started = True
         st.session_state.starting_interview = True
         st.rerun()
 
-# ---------- Phase 2: API call ----------
+# ---------- Phase 2 ----------
 if st.session_state.starting_interview:
     system_prompt = build_interview_system_prompt(
         st.session_state.interview_strategy,
         st.session_state.difficulty,
         st.session_state.persona
     )
-
     st.session_state.messages = [{"role": "system", "content": system_prompt}]
     first_q = call_interviewer(st.session_state.messages)
     st.session_state.messages.append({"role": "assistant", "content": first_q})
-
     st.session_state.starting_interview = False
     st.rerun()
 
-# ---------- Interview (BUG FIXED HERE) ----------
+# ---------- Interview ----------
 if st.session_state.interview_started and st.session_state.messages:
     st.subheader("💬 Interview Session")
 
-    # render existing history
     for msg in st.session_state.messages[1:]:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
@@ -278,12 +272,6 @@ if st.session_state.interview_started and st.session_state.messages:
     user_input = st.chat_input("Type your answer...")
 
     if user_input:
-        if st.session_state.request_count >= MAX_REQUESTS_PER_SESSION:
-            st.error("Request limit reached.")
-            st.stop()
-
-        st.session_state.request_count += 1
-
         if len(user_input) > MAX_INPUT_LENGTH:
             st.warning("Answer too long.")
             st.stop()
@@ -296,28 +284,17 @@ if st.session_state.interview_started and st.session_state.messages:
             st.warning("Invalid interview answer.")
             st.stop()
 
-        # 1️⃣ append user
-        st.session_state.messages.append(
-            {"role": "user", "content": user_input}
-        )
-
-        # 2️⃣ render user immediately
+        st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
             st.write(user_input)
 
-        # 3️⃣ call interviewer
         reply = call_interviewer(st.session_state.messages)
-
-        # 4️⃣ append assistant
-        st.session_state.messages.append(
-            {"role": "assistant", "content": reply}
-        )
+        st.session_state.messages.append({"role": "assistant", "content": reply})
 
         score = extract_score(reply)
         if score is not None:
             st.session_state.scores.append(score)
 
-        # 5️⃣ render assistant immediately
         with st.chat_message("assistant"):
             st.write(reply)
 
@@ -341,7 +318,7 @@ if st.session_state.token_usage["prompt_tokens"] > 0:
 st.divider()
 st.subheader("🔄 Interview Reset")
 
-if st.button("🆕 Start New Interview"):
+if st.button("🆕 Start New Interview", type="primary"):
     reset_interview_only()
     st.success("Interview reset. Job analysis is kept.")
     st.rerun()
