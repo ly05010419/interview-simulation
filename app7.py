@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 
 # ================== ENV ==================
 load_dotenv()
-
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
     raise RuntimeError("OPENAI_API_KEY not set")
@@ -151,15 +150,13 @@ def extract_score(text):
     return int(m.group(1)) if m else None
 
 
-# ✅ Reset = 只重置“面试”，不动 JD
+# Reset = 只重置面试，不重置 JD
 def reset_interview_only():
     st.session_state.interview_started = False
     st.session_state.starting_interview = False
-
     st.session_state.messages = []
     st.session_state.scores = []
     st.session_state.request_count = 0
-
     st.session_state.token_usage = {
         "prompt_tokens": 0,
         "completion_tokens": 0,
@@ -210,7 +207,6 @@ if st.button("🔍 Analyze Job Description", disabled=st.session_state.interview
 if st.session_state.show_jd_dialog:
     st.dialog("Job Analysis")
     st.markdown("### ⏳ Analyzing job description…")
-    st.markdown("Please wait while the analysis is running.")
 
     if not st.session_state.jd_done:
         st.session_state.interview_strategy = analyze_job_description(job_desc)
@@ -250,7 +246,7 @@ if st.session_state.job_analyzed:
     )
 
     if st.button("🚀 Start Interview", disabled=st.session_state.interview_started):
-        # Phase 1 — 立即锁 UI
+        # Phase 1: 立刻锁 UI
         st.session_state.interview_started = True
         st.session_state.starting_interview = True
         st.rerun()
@@ -270,10 +266,11 @@ if st.session_state.starting_interview:
     st.session_state.starting_interview = False
     st.rerun()
 
-# ---------- Interview ----------
+# ---------- Interview (BUG FIXED HERE) ----------
 if st.session_state.interview_started and st.session_state.messages:
     st.subheader("💬 Interview Session")
 
+    # render existing history
     for msg in st.session_state.messages[1:]:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
@@ -299,14 +296,28 @@ if st.session_state.interview_started and st.session_state.messages:
             st.warning("Invalid interview answer.")
             st.stop()
 
-        st.session_state.messages.append({"role": "user", "content": user_input})
+        # 1️⃣ append user
+        st.session_state.messages.append(
+            {"role": "user", "content": user_input}
+        )
+
+        # 2️⃣ render user immediately
+        with st.chat_message("user"):
+            st.write(user_input)
+
+        # 3️⃣ call interviewer
         reply = call_interviewer(st.session_state.messages)
-        st.session_state.messages.append({"role": "assistant", "content": reply})
+
+        # 4️⃣ append assistant
+        st.session_state.messages.append(
+            {"role": "assistant", "content": reply}
+        )
 
         score = extract_score(reply)
         if score is not None:
             st.session_state.scores.append(score)
 
+        # 5️⃣ render assistant immediately
         with st.chat_message("assistant"):
             st.write(reply)
 
