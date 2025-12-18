@@ -84,24 +84,6 @@ Rules:
 
 # ================== HELPERS ==================
 
-def check_moderation(text: str) -> bool:
-    r = client.moderations.create(
-        model="omni-moderation-latest",
-        input=text
-    )
-    return not r.results[0].flagged
-
-def validate_user_input(text: str) -> bool:
-    r = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": INPUT_GUARD_PROMPT},
-            {"role": "user", "content": text}
-        ],
-        temperature=0
-    )
-    return r.choices[0].message.content.startswith("VALID")
-
 def update_cost(usage):
     st.session_state.token_usage["prompt"] += usage.prompt_tokens
     st.session_state.token_usage["completion"] += usage.completion_tokens
@@ -136,6 +118,7 @@ for k, v in defaults.items():
 with st.sidebar:
     st.header("📌 Interview Panel")
 
+    # ---- Strategy ----
     if st.session_state.job_analyzed:
         with st.expander("Interview Strategy", expanded=True):
             st.markdown(st.session_state.interview_strategy)
@@ -144,23 +127,31 @@ with st.sidebar:
 
     st.divider()
 
+    # ---- Performance (Horizontal) ----
     st.subheader("📊 Performance")
+    p1, p2 = st.columns(2)
+
     if st.session_state.scores:
         avg = round(sum(st.session_state.scores) / len(st.session_state.scores), 2)
-        st.metric("Questions", len(st.session_state.scores))
-        st.metric("Average Score", avg)
+        p1.metric("Questions", len(st.session_state.scores))
+        p2.metric("Avg Score", avg)
     else:
-        st.caption("No answers yet.")
+        p1.metric("Questions", 0)
+        p2.metric("Avg Score", "-")
 
     st.divider()
 
+    # ---- Cost (Horizontal) ----
     st.subheader("💰 Usage & Cost")
-    st.metric("Prompt Tokens", st.session_state.token_usage["prompt"])
-    st.metric("Completion Tokens", st.session_state.token_usage["completion"])
-    st.metric("Cost (USD)", f"${st.session_state.token_usage['cost']:.6f}")
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric("Prompt", st.session_state.token_usage["prompt"])
+    c2.metric("Completion", st.session_state.token_usage["completion"])
+    c3.metric("USD", f"${st.session_state.token_usage['cost']:.6f}")
 
     st.divider()
 
+    # ---- Reset ----
     if st.button("🟢 Start New Interview", type="primary"):
         for k, v in defaults.items():
             st.session_state[k] = v
