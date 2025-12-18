@@ -369,7 +369,3 @@ if st.button("🆕 Start New Interview", type="primary"):
     reset_interview_only()
     st.success("Interview reset. Job analysis is kept.")
     st.rerun()
-
-
-st.write("Custom theme:",
-         os.path.exists(".streamlit/config.toml"))
