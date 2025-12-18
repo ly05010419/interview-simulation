@@ -16,7 +16,6 @@ client = OpenAI(api_key=api_key)
 
 MODEL_NAME = "gpt-4o-mini"
 MAX_INPUT_LENGTH = 800
-MAX_REQUESTS_PER_SESSION = 30
 
 PRICE_INPUT_PER_M = 0.05
 PRICE_OUTPUT_PER_M = 0.40
@@ -44,9 +43,7 @@ If it IS valid, analyze and output:
 INPUT_GUARD_PROMPT = """
 You are a security guard for an AI interview application.
 
-Determine whether the user input is a valid interview answer.
-
-If valid, respond:
+If the input is a valid interview answer respond:
 VALID
 
 Otherwise:
@@ -57,13 +54,13 @@ def build_interview_system_prompt(strategy, difficulty, persona):
     persona_map = {
         "Friendly": "Be encouraging and supportive.",
         "Neutral": "Be professional and neutral.",
-        "Strict": "Be strict, concise, and challenging."
+        "Strict": "Be strict and challenging."
     }
 
     difficulty_map = {
         "Easy": "Ask basic conceptual questions.",
         "Medium": "Ask practical and applied questions.",
-        "Hard": "Ask deep, advanced, and edge-case questions."
+        "Hard": "Ask deep and advanced questions."
     }
 
     return f"""
@@ -124,7 +121,6 @@ defaults = {
     "interview_started": False,
     "messages": [],
     "scores": [],
-    "request_count": 0,
     "difficulty": "Medium",
     "persona": "Neutral",
     "token_usage": {"prompt": 0, "completion": 0, "cost": 0.0},
@@ -138,13 +134,37 @@ for k, v in defaults.items():
 # ================== SIDEBAR ==================
 
 with st.sidebar:
-    st.header("📌 Interview Strategy")
+    st.header("📌 Interview Panel")
 
     if st.session_state.job_analyzed:
-        with st.expander("View Strategy", expanded=True):
+        with st.expander("Interview Strategy", expanded=True):
             st.markdown(st.session_state.interview_strategy)
     else:
-        st.info("Analyze a job description to see the strategy.")
+        st.info("Analyze a job description to see strategy.")
+
+    st.divider()
+
+    st.subheader("📊 Performance")
+    if st.session_state.scores:
+        avg = round(sum(st.session_state.scores) / len(st.session_state.scores), 2)
+        st.metric("Questions", len(st.session_state.scores))
+        st.metric("Average Score", avg)
+    else:
+        st.caption("No answers yet.")
+
+    st.divider()
+
+    st.subheader("💰 Usage & Cost")
+    st.metric("Prompt Tokens", st.session_state.token_usage["prompt"])
+    st.metric("Completion Tokens", st.session_state.token_usage["completion"])
+    st.metric("Cost (USD)", f"${st.session_state.token_usage['cost']:.6f}")
+
+    st.divider()
+
+    if st.button("🟢 Start New Interview", type="primary"):
+        for k, v in defaults.items():
+            st.session_state[k] = v
+        st.rerun()
 
 # ================== UI ==================
 
@@ -156,7 +176,7 @@ st.subheader("1️⃣ Job Description")
 
 job_desc = st.text_area("Paste the job description", height=150)
 
-if st.button("🔍 Analyze Job Description"):
+if st.button("🔍 Analyze Job Description", type="primary"):
     with st.spinner("Analyzing job description..."):
         resp = client.chat.completions.create(
             model=MODEL_NAME,
@@ -198,7 +218,7 @@ if st.session_state.job_analyzed:
         disabled=st.session_state.interview_started
     )
 
-    if st.button("🚀 Start Interview", disabled=st.session_state.interview_started):
+    if st.button("🚀 Start Interview", type="primary", disabled=st.session_state.interview_started):
         system_prompt = build_interview_system_prompt(
             st.session_state.interview_strategy,
             st.session_state.difficulty,
@@ -258,35 +278,3 @@ if st.session_state.interview_started:
             update_cost(reply.usage)
 
         st.rerun()
-
-# ---------- Performance ----------
-
-if st.session_state.scores:
-    st.subheader("📊 Performance")
-
-    col1, col2 = st.columns(2)
-    col1.metric("Questions Answered", len(st.session_state.scores))
-    col2.metric(
-        "Average Score",
-        round(sum(st.session_state.scores) / len(st.session_state.scores), 2)
-    )
-
-# ---------- Cost ----------
-
-if st.session_state.token_usage["cost"] > 0:
-    st.subheader("💰 Usage & Cost")
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Prompt Tokens", st.session_state.token_usage["prompt"])
-    c2.metric("Completion Tokens", st.session_state.token_usage["completion"])
-    c3.metric("Cost (USD)", f"${st.session_state.token_usage['cost']:.6f}")
-
-# ---------- Reset ----------
-
-st.subheader("🔁 Interview Reset")
-
-if st.button("🟢 Start New Interview"):
-    for k, v in defaults.items():
-        st.session_state[k] = v
-    st.success("Interview reset. You can start a new one.")
-    st.rerun()
