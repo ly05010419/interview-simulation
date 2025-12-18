@@ -78,8 +78,11 @@ Difficulty:
 Rules:
 - Ask one question at a time
 - Wait for the answer
-- Give feedback
-- Always include: Score: X/5
+- Give concise feedback
+- At the end of every response, you MUST include a separate line exactly in this format:
+  Score: X/5
+  Where X is an integer from 0 to 5.
+- Do not change this format.
 """
 
 # ================== HELPERS ==================
@@ -93,8 +96,13 @@ def update_cost(usage):
     )
 
 def extract_score(text):
+    # strict first
     m = re.search(r"Score:\s*([0-5])\s*/\s*5", text)
-    return int(m.group(1)) if m else None
+    if m:
+        return int(m.group(1))
+    # fallback
+    m2 = re.search(r"([0-5])\s*/\s*5", text)
+    return int(m2.group(1)) if m2 else None
 
 # ================== SESSION STATE ==================
 
@@ -118,7 +126,6 @@ for k, v in defaults.items():
 with st.sidebar:
     st.header("📌 Interview Panel")
 
-    # ---- Strategy ----
     if st.session_state.job_analyzed:
         with st.expander("Interview Strategy", expanded=True):
             st.markdown(st.session_state.interview_strategy)
@@ -127,7 +134,6 @@ with st.sidebar:
 
     st.divider()
 
-    # ---- Performance (Horizontal) ----
     st.subheader("📊 Performance")
     p1, p2 = st.columns(2)
 
@@ -141,17 +147,14 @@ with st.sidebar:
 
     st.divider()
 
-    # ---- Cost (Horizontal) ----
     st.subheader("💰 Usage & Cost")
     c1, c2, c3 = st.columns(3)
-
     c1.metric("Prompt", st.session_state.token_usage["prompt"])
     c2.metric("Completion", st.session_state.token_usage["completion"])
     c3.metric("USD", f"${st.session_state.token_usage['cost']:.6f}")
 
     st.divider()
 
-    # ---- Reset ----
     if st.button("🟢 Start New Interview", type="primary"):
         for k, v in defaults.items():
             st.session_state[k] = v
@@ -165,9 +168,17 @@ st.title("🤖 AI Interview Preparation App")
 
 st.subheader("1️⃣ Job Description")
 
-job_desc = st.text_area("Paste the job description", height=150)
+job_desc = st.text_area(
+    "Paste the job description",
+    height=150,
+    disabled=st.session_state.interview_started
+)
 
-if st.button("🔍 Analyze Job Description", type="primary"):
+if st.button(
+    "🔍 Analyze Job Description",
+    type="primary",
+    disabled=st.session_state.interview_started
+):
     with st.spinner("Analyzing job description..."):
         resp = client.chat.completions.create(
             model=MODEL_NAME,
@@ -209,7 +220,11 @@ if st.session_state.job_analyzed:
         disabled=st.session_state.interview_started
     )
 
-    if st.button("🚀 Start Interview", type="primary", disabled=st.session_state.interview_started):
+    if st.button(
+        "🚀 Start Interview",
+        type="primary",
+        disabled=st.session_state.interview_started
+    ):
         system_prompt = build_interview_system_prompt(
             st.session_state.interview_strategy,
             st.session_state.difficulty,
