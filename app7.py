@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 # ================== SETUP ==================
 
 load_dotenv()
-
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
     raise RuntimeError("OPENAI_API_KEY not set")
@@ -25,11 +24,7 @@ PRICE_OUTPUT_PER_M = 0.40
 JD_ANALYSIS_PROMPT = """
 You are a senior technical recruiter.
 
-First, determine whether the input is a REAL job description.
-If it is NOT a job description, respond ONLY with:
-INVALID_JOB_DESCRIPTION
-
-If it IS valid, analyze and output:
+Analyze the following job description and output:
 
 - Seniority
 - Key Skills
@@ -40,7 +35,17 @@ If it IS valid, analyze and output:
 - Evaluation Criteria
 """
 
-INPUT_GUARD_PROMPT = """
+JD_GUARD_PROMPT = """
+You are a validator for a job interview preparation app.
+
+If the input is a real job description, respond:
+VALID
+
+Otherwise respond:
+INVALID
+"""
+
+ANSWER_GUARD_PROMPT = """
 You are a security guard for an AI interview application.
 
 If the input is a valid interview answer respond:
@@ -51,39 +56,53 @@ INVALID
 """
 
 def build_interview_system_prompt(strategy, difficulty, persona):
-    persona_map = {
-        "Friendly": "Be encouraging and supportive.",
-        "Neutral": "Be professional and neutral.",
-        "Strict": "Be strict and challenging."
-    }
-
-    difficulty_map = {
-        "Easy": "Ask basic conceptual questions.",
-        "Medium": "Ask practical and applied questions.",
-        "Hard": "Ask deep and advanced questions."
-    }
-
     return f"""
 You are a senior technical interviewer.
 
 Interview Strategy:
 {strategy}
 
-Persona:
-{persona_map[persona]}
-
-Difficulty:
-{difficulty_map[difficulty]}
+Difficulty: {difficulty}
+Persona: {persona}
 
 Rules:
 - Ask one question at a time
 - Wait for the answer
-- Give concise feedback
-- At the end of every response, you MUST include a separate line exactly in this format:
-  Score: X/5
-  Where X is an integer from 0 to 5.
-- Do not change this format.
+- Give feedback
+- At the end of every response, include exactly:
+Score: X/5
 """
+
+# ================== SECURITY ==================
+
+def check_moderation(text: str) -> bool:
+    r = client.moderations.create(
+        model="omni-moderation-latest",
+        input=text
+    )
+    return not r.results[0].flagged
+
+def validate_job_description(text: str) -> bool:
+    r = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": JD_GUARD_PROMPT},
+            {"role": "user", "content": text}
+        ],
+        temperature=0
+    )
+    return r.choices[0].message.content.startswith("VALID")
+
+def validate_user_input(text: str) -> bool:
+    r = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": ANSWER_GUARD_PROMPT},
+            {"role": "user", "content": text}
+        ],
+        temperature=0
+    )
+    return r.choices[0].message.content.startswith("VALID")
 
 # ================== HELPERS ==================
 
@@ -96,13 +115,8 @@ def update_cost(usage):
     )
 
 def extract_score(text):
-    # strict first
     m = re.search(r"Score:\s*([0-5])\s*/\s*5", text)
-    if m:
-        return int(m.group(1))
-    # fallback
-    m2 = re.search(r"([0-5])\s*/\s*5", text)
-    return int(m2.group(1)) if m2 else None
+    return int(m.group(1)) if m else None
 
 # ================== SESSION STATE ==================
 
@@ -118,8 +132,7 @@ defaults = {
 }
 
 for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+    st.session_state.setdefault(k, v)
 
 # ================== SIDEBAR ==================
 
@@ -130,20 +143,18 @@ with st.sidebar:
         with st.expander("Interview Strategy", expanded=True):
             st.markdown(st.session_state.interview_strategy)
     else:
-        st.info("Analyze a job description to see strategy.")
+        st.info("Analyze a job description first.")
 
     st.divider()
 
     st.subheader("📊 Performance")
-    p1, p2 = st.columns(2)
-
+    c1, c2 = st.columns(2)
     if st.session_state.scores:
-        avg = round(sum(st.session_state.scores) / len(st.session_state.scores), 2)
-        p1.metric("Questions", len(st.session_state.scores))
-        p2.metric("Avg Score", avg)
+        c1.metric("Questions", len(st.session_state.scores))
+        c2.metric("Avg Score", round(sum(st.session_state.scores)/len(st.session_state.scores), 2))
     else:
-        p1.metric("Questions", 0)
-        p2.metric("Avg Score", "-")
+        c1.metric("Questions", 0)
+        c2.metric("Avg Score", "-")
 
     st.divider()
 
@@ -179,6 +190,14 @@ if st.button(
     type="primary",
     disabled=st.session_state.interview_started
 ):
+    if not check_moderation(job_desc):
+        st.error("Job description violates safety policy.")
+        st.stop()
+
+    if not validate_job_description(job_desc):
+        st.warning("This does not look like a job description.")
+        st.stop()
+
     with st.spinner("Analyzing job description..."):
         resp = client.chat.completions.create(
             model=MODEL_NAME,
@@ -189,13 +208,8 @@ if st.button(
             temperature=0.3
         )
 
-        content = resp.choices[0].message.content.strip()
-
-        if content == "INVALID_JOB_DESCRIPTION":
-            st.error("❌ This does not look like a job description.")
-        else:
-            st.session_state.interview_strategy = content
-            st.session_state.job_analyzed = True
+        st.session_state.interview_strategy = resp.choices[0].message.content
+        st.session_state.job_analyzed = True
 
         if resp.usage:
             update_cost(resp.usage)
@@ -248,10 +262,7 @@ if st.session_state.job_analyzed:
 
         st.rerun()
 
-else:
-    st.info("Analyze the job description first.")
-
-# ---------- Interview Session ----------
+# ---------- Interview ----------
 
 if st.session_state.interview_started:
     st.subheader("💬 Interview Session")
@@ -263,8 +274,19 @@ if st.session_state.interview_started:
     user_input = st.chat_input("Your answer")
 
     if user_input:
-        st.session_state.messages.append({"role": "user", "content": user_input})
+        if len(user_input) > MAX_INPUT_LENGTH:
+            st.warning("Answer too long.")
+            st.stop()
 
+        if not check_moderation(user_input):
+            st.error("Unsafe input.")
+            st.stop()
+
+        if not validate_user_input(user_input):
+            st.warning("Invalid interview answer.")
+            st.stop()
+
+        st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
             st.write(user_input)
 
