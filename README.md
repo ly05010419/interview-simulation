@@ -14,7 +14,7 @@ streamlit run app.py
 
 ---
 
-## 🌍 Deployment
+## 🌍 Test
 
 Deployable on:
 - Azure App Service
@@ -141,44 +141,6 @@ Security mechanisms were validated using **black-box testing**, simulating misus
   - Scores
   - Cost
 - Keeps job description analysis for reuse
-
----
-
-## 🛠️ Tech Stack
-
-- **Frontend / App Framework:** Streamlit
-- **LLM API:** OpenAI
-- **Language:** Python 3.9+
-- **State Management:** Streamlit session_state
-
----
-
-## 📂 Project Structure
-
-```text
-.
-├── app.py
-├── requirements.txt
-├── .streamlit/
-│   └── config.toml
-└── README.md
-```
-
----
-
-## 🎨 Theme Customization
-
-Create `.streamlit/config.toml`:
-
-```toml
-[theme]
-primaryColor = "#2ECC71"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F5F5F5"
-textColor = "#262730"
-```
-
-Restart Streamlit after changes.
 
 ---
 
