@@ -167,9 +167,9 @@ if st.button("🔍 Analyze Job Description"):
             temperature=0.3
         )
 
-        content = resp.choices[0].message.content
+        content = resp.choices[0].message.content.strip()
 
-        if content.strip() == "INVALID_JOB_DESCRIPTION":
+        if content == "INVALID_JOB_DESCRIPTION":
             st.error("❌ This does not look like a job description.")
         else:
             st.session_state.interview_strategy = content
@@ -177,6 +177,8 @@ if st.button("🔍 Analyze Job Description"):
 
         if resp.usage:
             update_cost(resp.usage)
+
+    st.rerun()
 
 # ---------- Start Interview ----------
 
@@ -217,6 +219,8 @@ if st.session_state.job_analyzed:
 
         if first_q.usage:
             update_cost(first_q.usage)
+
+        st.rerun()
 
 else:
     st.info("Analyze the job description first.")
