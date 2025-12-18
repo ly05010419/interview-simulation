@@ -1,4 +1,3 @@
-
 # 🤖 AI Interview Preparation App
 
 An AI-powered interview preparation web application built with **Streamlit** and **OpenAI APIs**.  
@@ -6,16 +5,28 @@ The app analyzes a job description, derives an interview strategy, and conducts 
 
 ---
 
-## ✨ Features
+## 🚀 Getting Started
 
-- Job Description analysis → interview strategy generation
-- AI interviewer with multi-turn conversation
-- Dynamic system prompts based on role & JD
-- Real-time feedback and scoring (0–5)
-- Single-page Streamlit UI
-- Ready for deployment on Streamlit Cloud
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
 
 ---
+
+## 🌍 Deployment
+
+Deployable on:
+- Azure App Service
+https://interview-chatbot-azhpdegcgcg2czhp.westeurope-01.azurewebsites.net/
+- Streamlit Community Cloud
+https://app7py-9jxge28hydsblebqsrbhbt.streamlit.app/
+
+---
+
+![image](https://github.com/ly05010419/interview-simulation/blob/main/screenshot.png?raw=true)
+
+
 
 ## 🧱 Architecture Overview
 
@@ -34,6 +45,39 @@ OpenAI Moderation API (Output)
  ↓
 User
 ```
+
+---
+
+## ✨ Features
+
+### 🧾 Job Description Analysis
+- Paste a job description
+- Automatically extracts:
+  - Seniority level
+  - Key technical & soft skills
+  - Interview focus areas
+  - Interview strategy & evaluation criteria
+- Analysis runs in a **modal-style dialog** for better UX
+
+---
+
+### 🎯 Configurable Interview Setup
+- **Difficulty levels**
+  - Easy / Medium / Hard
+- **Interviewer personas**
+  - Strict
+  - Neutral
+  - Friendly
+- Selections are **locked immediately** when the interview starts
+
+---
+
+### 💬 Full Interview Chat Experience
+- One question at a time
+- Candidate answers via chat
+- AI provides:
+  - Concise feedback
+  - **Score (0–5)** for each answer
 
 ---
 
@@ -75,41 +119,66 @@ Security mechanisms were validated using **black-box testing**, simulating misus
 
 ---
 
-## 🚦 Cost & Risk Control
+### 📊 Performance & Cost Tracking
+- Tracks:
+  - Number of questions answered
+  - Average score
+  - Prompt & completion tokens
+  - Estimated API cost (USD)
 
-- Early rejection of unsafe inputs avoids unnecessary token usage
-- Session-based limits protect against request flooding
-- Moderation applied before and after LLM calls
+---
+
+### 🔐 Safety & Misuse Protection
+- Input and output moderation via OpenAI Moderation API
+- Prompt-injection guard for user answers
+- Rate limiting per session
+
+---
+
+### 🔄 Reset Without Losing Context
+- **Start New Interview** resets:
+  - Chat history
+  - Scores
+  - Cost
+- Keeps job description analysis for reuse
 
 ---
 
 ## 🛠️ Tech Stack
 
 - **Frontend / App Framework:** Streamlit
-- **Language:** Python
-- **LLM Provider:** OpenAI
-- **Security:** OpenAI Moderation API + LLM-based input guards
-
-## 📌 Project Goals
-
-This project was created as part of an **AI Engineering / Prompt Engineering  sprint 1**, with a strong focus on:
-
-- Prompt design
-- Context management
-- Safety & misuse prevention
-- Production-aware AI system design
+- **LLM API:** OpenAI
+- **Language:** Python 3.9+
+- **State Management:** Streamlit session_state
 
 ---
 
-## Bonus Points:
+## 📂 Project Structure
 
-Medium:
+```text
+.
+├── app.py
+├── requirements.txt
+├── .streamlit/
+│   └── config.toml
+└── README.md
+```
 
-- Deploy your app to the Internet.
-- Calculate and provide output to the user on the price of the prompt.
-- Add a separate text field or another field to include the job description (the position) you are applying for and getting interview preparation for that particular position (RAG).
+---
 
-Hard:
+## 🎨 Theme Customization
 
-- Using Streamlit (Python) or React (JS) components, implement a full-fledged chatbot application instead of a one-time call to the OpenAI API.
-- Deploy your app to one of these cloud providers: Gemini, AWS, or Azure.
+Create `.streamlit/config.toml`:
+
+```toml
+[theme]
+primaryColor = "#2ECC71"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F5F5F5"
+textColor = "#262730"
+```
+
+Restart Streamlit after changes.
+
+---
+
