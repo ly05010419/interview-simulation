@@ -39,9 +39,9 @@ Input Guards (length, intent validation)
  ↓
 OpenAI Moderation API (Input)
  ↓
-AI Interviewer (Chat Completion)
+Custom Guard Prompt 
  ↓
-OpenAI Moderation API (Output)
+AI Interviewer (Chat Completion)
  ↓
 User
 ```
